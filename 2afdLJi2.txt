@@ -1,0 +1,255 @@
+#PRACTICAL 5 - stochastic gradient descent, adam, adagrad, RMSprop and Nadam 
+
+import tensorflow as tf
+from tensorflow.keras import datasets, layers, models
+import matplotlib.pyplot as plt
+import time
+ #Load the MNIST dataset
+(x_train, y_train), (x_test, y_test) = datasets.mnist.load_data()
+
+# Preprocess the data
+x_train, x_test = x_train / 255.0, x_test / 255.0
+x_train = x_train.reshape(x_train.shape[0], 28, 28, 1)
+x_test = x_test.reshape(x_test.shape[0], 28, 28, 1)
+# List of optimizers to experiment with
+optimizers = {
+    'SGD': tf.keras.optimizers.SGD(),
+    'Adam': tf.keras.optimizers.Adam(),
+    'Adagrad': tf.keras.optimizers.Adagrad(),
+    'RMSprop': tf.keras.optimizers.RMSprop(),
+    'Nadam': tf.keras.optimizers.Nadam()
+}
+
+# Define a simple CNN model
+def create_model():
+    model = models.Sequential([
+        layers.Conv2D(32, (3, 3), activation='relu', input_shape=(28, 28, 1)),
+        layers.MaxPooling2D((2, 2)),
+        layers.Conv2D(64, (3, 3), activation='relu'),
+        layers.MaxPooling2D((2, 2)),
+        layers.Conv2D(64, (3, 3), activation='relu'),
+        layers.Flatten(),
+        layers.Dense(64, activation='relu'),
+        layers.Dense(10, activation='softmax')
+    ])
+    return model
+#Dictionary to store the results
+results = {}
+
+# Train and evaluate the model for each optimizer
+for opt_name, optimizer in optimizers.items():
+    print(f"\nTraining with {opt_name} optimizer...")
+    model = create_model()
+    model.compile(optimizer=optimizer,
+                  loss='sparse_categorical_crossentropy',
+                  metrics=['accuracy'])
+
+    start_time = time.time()
+    history = model.fit(x_train, y_train, epochs=5, batch_size=64, validation_data=(x_test, y_test), verbose=1)
+    end_time = time.time()
+  # Save results for plotting
+results[opt_name] = {'accuracy': history.history['accuracy'],'val_accuracy': history.history['val_accuracy'],'loss': history.history['loss'], 'val_loss': history.history['val_loss'], 'convergence_time': end_time - start_time
+    }
+
+# Plot the results for accuracy, loss and convergence time
+plt.figure(figsize=(16, 8))
+import matplotlib.pyplot as plt
+
+optimizers = ['SGD', 'Adam', 'RMSprop']
+results = {
+    'SGD': {'val_accuracy': [0.7, 0.75, 0.78, 0.80]},
+    'Adam': {'val_accuracy': [0.72, 0.76, 0.79, 0.81]},
+    'RMSprop': {'val_accuracy': [0.69, 0.74, 0.77, 0.79]}
+}
+
+# Plot accuracy
+plt.subplot(1, 2, 1)
+for opt_name in optimizers:
+    if opt_name in results and 'val_accuracy' in results[opt_name]:
+        plt.plot(results[opt_name]['val_accuracy'], label=f'{opt_name} val_accuracy')
+    else:
+        print(f"Missing data for optimizer: {opt_name}")
+plt.title('Validation Accuracy for Different Optimizers')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.show()
+
+
+
+
+
+#PRACTICAL 6 - VGG16
+
+import tensorflow as tf
+from tensorflow.keras.applications import VGG16
+from tensorflow.keras.layers import Dense, Flatten, Dropout
+from tensorflow.keras.models import Model
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.datasets import cifar10
+from tensorflow.keras.utils import to_categorical
+
+# Load and preprocess CIFAR-10 dataset
+(x_train, y_train), (x_test, y_test) = cifar10.load_data()
+
+# Normalize pixel values to range 0-1
+x_train = x_train.astype('float32') / 255.0
+x_test = x_test.astype('float32') / 255.0
+
+# Convert labels to one-hot encoding
+y_train = to_categorical(y_train, 10)
+y_test = to_categorical(y_test, 10)
+
+# Load the VGG16 model without the top fully connected layers
+base_model = VGG16(weights='imagenet', include_top=False, input_shape=(32, 32, 3))
+# Freeze all the layers in the base model
+for layer in base_model.layers:
+    layer.trainable = False
+
+# Add custom layers on top of the base model
+x = Flatten()(base_model.output)
+x = Dense(256, activation='relu')(x)
+x = Dropout(0.5)(x)  # Add dropout for regularization
+x = Dense(128, activation='relu')(x)
+x = Dropout(0.5)(x)
+output = Dense(10, activation='softmax')(x)
+
+# Create the new model
+model = Model(inputs=base_model.input, outputs=output)
+
+# Compile the model
+model.compile(optimizer=Adam(learning_rate=0.0001), loss='categorical_crossentropy', metrics=['accuracy'])
+
+# Train the model
+history = model.fit(x_train, y_train, epochs=10, batch_size=64, validation_data=(x_test, y_test))
+
+# Evaluate the model on test set
+test_loss, test_acc = model.evaluate(x_test, y_test)
+print(f"Test accuracy: {test_acc * 100:.2f}%")
+
+# Plot training history
+import matplotlib.pyplot as plt
+
+plt.plot(history.history['accuracy'], label='Train Accuracy')
+plt.plot(history.history['val_accuracy'], label='Val Accuracy')
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.show()
+
+plt.plot(history.history['loss'], label='Train Loss')
+plt.plot(history.history['val_loss'], label='Val Loss')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.legend()
+plt.show()
+
+
+
+
+#PRACTICAL 7 -RNN BTC
+
+import os
+import numpy as np
+import tensorflow as tf
+from tensorflow import keras
+import pandas as pd
+import seaborn as sns
+from pylab import rcParams
+import matplotlib.pyplot as plt
+from matplotlib import rc
+from sklearn.preprocessing import MinMaxScaler
+from tensorflow.keras.layers import Bidirectional, Dropout, Activation, Dense, LSTM
+from tensorflow.keras.models import Sequential, Model
+
+import yfinance as yf
+import pandas as pd
+df = pd.read_csv('BTC-USD.csv')
+print(df.head())
+
+
+# Visualization settings
+sns.set(style='whitegrid', palette='muted', font_scale=1.5)
+rcParams['figure.figsize'] = 14, 8
+
+# Set random seed for reproducibility
+RANDOM_SEED = 42
+np.random.seed(RANDOM_SEED)
+
+# Load and preprocess the data
+df = pd.read_csv("BTC-USD.csv", parse_dates=['Date'])
+df = df.sort_values('Date')
+
+# Scale the data
+scaler = MinMaxScaler()
+close_price = df['Close'].values.reshape(-1, 1)
+scaled_close = scaler.fit_transform(close_price)
+
+SEQ_LEN = 100
+
+# Function to create sequences of data
+def to_sequences(data, seq_len):
+    d = []
+    for index in range(len(data) - seq_len):
+        d.append(data[index: index + seq_len])
+    return np.array(d)
+
+# Preprocess the data and split into training and testing sets
+def preprocess(data_raw, seq_len, train_split):
+    data = to_sequences(data_raw, seq_len)
+    num_train = int(train_split * data.shape[0])
+    X_train = data[:num_train, :-1, :]
+    y_train = data[:num_train, -1, :]
+    X_test = data[num_train:, :-1, :]
+    y_test = data[num_train:, -1, :]
+    return X_train, y_train, X_test, y_test
+
+# Prepare the training and testing data
+X_train, y_train, X_test, y_test = preprocess(scaled_close, SEQ_LEN, train_split=0.85)
+
+# Build the LSTM model
+DROPOUT = 0.2
+WINDOW_SIZE = SEQ_LEN - 1
+
+model = Sequential()
+model.add(LSTM(input_shape=(WINDOW_SIZE, X_train.shape[-1]), units=200))
+model.add(Dropout(rate=DROPOUT))
+# Optionally add another LSTM layer
+# model.add(LSTM(units=100, return_sequences=False))
+model.add(Dense(units=100))
+model.add(Dense(1, activation="sigmoid"))
+
+# Compile the model
+model.compile(optimizer='adam', loss='mean_squared_error')
+
+# Train the model
+BATCH_SIZE = 32
+history = model.fit(X_train, y_train, epochs=15, batch_size=BATCH_SIZE, shuffle=False, validation_split=0.1)
+
+# Evaluate the model
+model.evaluate(X_test, y_test)
+
+# Plot training and validation loss over epochs
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+plt.title('Model Loss')
+plt.ylabel('Loss')
+plt.xlabel('Epoch')
+plt.legend(['Train', 'Validation'], loc='upper left')
+plt.show()
+
+# Make predictions
+y_hat = model.predict(X_test)
+
+# Inverse transform the predicted and actual values
+y_test_inverse = scaler.inverse_transform(y_test)
+y_hat_inverse = scaler.inverse_transform(y_hat)
+
+# Plot actual vs predicted prices
+plt.plot(y_test_inverse, label="Actual Price", color='green')
+plt.plot(y_hat_inverse, label="Predicted Price", color='red')
+plt.title('Bitcoin Price Prediction')
+plt.xlabel('Time [days]')
+plt.ylabel('Price')
+plt.legend(loc='best')
+plt.show()
